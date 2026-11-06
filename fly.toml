@@ -1,0 +1,33 @@
+app = "viral-clip-santo"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  MAX_DURATION_SEC = "7200"
+  MOCK_ANALYZE = "1"
+  DATA_DIR = "/data"
+
+[http_service]
+  internal_port = 8741
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "60s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "viral_clip_data"
+  destination = "/data"

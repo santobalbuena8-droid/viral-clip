@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Viral Clip</title>
+  <style>
+    :root {
+      --ink: #10110e;
+      --raised: #1b1d16;
+      --paper: #f4f1e6;
+      --muted: #b7b4a4;
+      --lime: #d6ff4a;
+      --line: #313428;
+      --danger: #ff6b4a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--ink);
+      color: var(--paper);
+      font: 16px/1.45 "Segoe UI", sans-serif;
+    }
+    main {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 28px 20px 64px;
+      display: grid;
+      gap: 22px;
+    }
+    @media (min-width: 800px) {
+      main { grid-template-columns: 1fr 280px; align-items: start; }
+      .preview-card { position: sticky; top: 16px; }
+    }
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0.08em;
+      color: var(--lime);
+    }
+    p { margin: 0; }
+    .lede { color: var(--paper); max-width: 46ch; }
+    .stack { display: flex; flex-direction: column; gap: 14px; }
+    label.section, .section {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    input[type="url"], input[type="number"] {
+      width: 100%;
+      background: var(--raised);
+      color: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font: inherit;
+    }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    button, .chip {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--raised);
+      color: var(--paper);
+    }
+    button.primary {
+      background: var(--lime);
+      color: var(--ink);
+      width: 100%;
+      padding: 14px;
+    }
+    button:disabled { opacity: 0.55; cursor: default; }
+    .swatch, .font-chip, .size-chip {
+      border: 2px solid transparent;
+      min-width: 44px;
+    }
+    .swatch { width: 44px; height: 44px; border-radius: 50%; padding: 0; }
+    .swatch.on, .font-chip.on, .size-chip.on { border-color: var(--lime); }
+    .colors { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    input[type="color"] {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+    .preview-card {
+      background: var(--raised);
+      border-radius: 20px;
+      padding: 16px;
+    }
+    .phone {
+      width: min(100%, 220px);
+      margin: 8px auto 0;
+      aspect-ratio: 9 / 16;
+      border-radius: 18px;
+      background:
+        radial-gradient(circle at 50% 30%, #2a3320, #10110e 70%);
+      position: relative;
+      overflow: hidden;
+    }
+    .caption {
+      position: absolute;
+      left: 8%;
+      right: 8%;
+      bottom: 12%;
+      text-align: center;
+      font-weight: 800;
+      line-height: 1.15;
+      color: var(--caption, #fff);
+    }
+    .hint { color: var(--muted); font-size: 13px; }
+    .error { color: var(--danger); }
+    .job { grid-column: 1 / -1; }
+    a.clip {
+      display: block;
+      background: var(--raised);
+      color: var(--lime);
+      text-decoration: none;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-top: 8px;
+    }
+    code { color: var(--lime); }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="stack">
+      <div>
+        <h1>VIRAL CLIP</h1>
+        <p class="lede">Pega un enlace. El estilo de abajo se quema en el MP4 vertical al crear los clips.</p>
+      </div>
+
+      <div class="section">Enlace</div>
+      <input id="url" type="url" placeholder="https://www.youtube.com/watch?v=…" />
+
+      <div class="section">Cuántos clips</div>
+      <div class="row" id="counts"></div>
+
+      <div class="section">Estilo de subtítulos</div>
+      <div class="section">Color del texto</div>
+      <div class="colors" id="text-colors"></div>
+      <div class="section">Color del contorno</div>
+      <div class="colors" id="outline-colors"></div>
+      <div class="section">Tamaño</div>
+      <div class="row" id="sizes"></div>
+      <div class="section">Fuente</div>
+      <div class="row" id="fonts"></div>
+      <p class="hint">La vista previa cambia al momento. El archivo se exporta con este estilo en el siguiente «Crear clips».</p>
+
+      <button class="primary" id="create" type="button">Crear clips</button>
+      <p id="message" class="hint"></p>
+      <div id="job" class="job" hidden></div>
+    </div>
+
+    <aside class="preview-card">
+      <div class="section">Vista previa 9:16</div>
+      <div class="phone" aria-hidden="true">
+        <div class="caption" id="caption">Así se ve el gancho</div>
+      </div>
+      <p class="hint">Misma posición baja que en TikTok. El servidor usa Noto Sans, Inter, Liberation Serif o Liberation Mono.</p>
+    </aside>
+  </main>
+  <script>
+    const TEXT_COLORS = ["#FFFFFF", "#FFE14A", "#D6FF4A", "#7EE7FF", "#FF8AD4"];
+    const OUTLINE_COLORS = ["#000000", "#FFFFFF", "#102040", "#3A0A0A"];
+    const SIZES = [
+      { id: 40, label: "Pequeño" },
+      { id: 54, label: "Medio" },
+      { id: 72, label: "Grande" },
+    ];
+    const FONTS = [
+      { id: "sans", label: "Sans", css: "Arial, 'Noto Sans', sans-serif" },
+      { id: "display", label: "Inter", css: "'Arial Black', Impact, sans-serif" },
+      { id: "serif", label: "Serif", css: "Georgia, 'Times New Roman', serif" },
+      { id: "mono", label: "Mono", css: "'Courier New', monospace" },
+    ];
+    const style = {
+      text_color: "#FFFFFF",
+      outline_color: "#000000",
+      font_size: 54,
+      font_family: "sans",
+    };
+    let maxClips = 3;
+    let pollTimer = 0;
+
+    function saved() {
+      try { return JSON.parse(localStorage.getItem("viral-clip-style") || "null"); }
+      catch { return null; }
+    }
+    const previous = saved();
+    if (previous) Object.assign(style, previous);
+
+    function persist() {
+      localStorage.setItem("viral-clip-style", JSON.stringify(style));
+      paintPreview();
+    }
+
+    function paintPreview() {
+      const node = document.getElementById("caption");
+      const font = FONTS.find((item) => item.id === style.font_family) || FONTS[0];
+      const px = Math.max(16, Math.round(style.font_size * 220 / 1280 * (9 / 16) * 3.2));
+      node.style.color = style.text_color;
+      node.style.fontFamily = font.css;
+      node.style.fontSize = px + "px";
+      const outline = style.outline_color;
+      node.style.textShadow = [
+        "-2px -2px 0 " + outline,
+        "2px -2px 0 " + outline,
+        "-2px 2px 0 " + outline,
+        "2px 2px 0 " + outline,
+        "0 2px 0 " + outline,
+      ].join(", ");
+    }
+
+    function swatches(host, colors, key) {
+      host.innerHTML = "";
+      colors.forEach((color) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "swatch" + (style[key] === color ? " on" : "");
+        button.style.background = color;
+        button.title = color;
+        button.setAttribute("aria-label", color);
+        button.addEventListener("click", () => {
+          style[key] = color;
+          persist();
+          swatches(host, colors, key);
+        });
+        host.appendChild(button);
+      });
+      const picker = document.createElement("input");
+      picker.type = "color";
+      picker.value = style[key];
+      picker.setAttribute("aria-label", key === "text_color" ? "Color del texto" : "Color del contorno");
+      picker.addEventListener("input", () => {
+        style[key] = picker.value.toUpperCase();
+        persist();
+        swatches(host, colors, key);
+      });
+      host.appendChild(picker);
+    }
+
+    function choices(host, items, current, apply, className) {
+      host.innerHTML = "";
+      items.forEach((item) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = className + (current === item.id ? " on" : "");
+        button.textContent = item.label;
+        button.addEventListener("click", () => {
+          apply(item.id);
+          persist();
+          choices(host, items, item.id, apply, className);
+        });
+        host.appendChild(button);
+      });
+    }
+
+    const counts = document.getElementById("counts");
+    for (let n = 1; n <= 5; n += 1) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = String(n);
+      button.className = n === maxClips ? "on" : "";
+      button.addEventListener("click", () => {
+        maxClips = n;
+        [...counts.children].forEach((child, index) => {
+          child.className = index + 1 === n ? "on" : "";
+        });
+      });
+      counts.appendChild(button);
+    }
+
+    swatches(document.getElementById("text-colors"), TEXT_COLORS, "text_color");
+    swatches(document.getElementById("outline-colors"), OUTLINE_COLORS, "outline_color");
+    choices(
+      document.getElementById("sizes"),
+      SIZES,
+      style.font_size,
+      (value) => { style.font_size = value; },
+      "size-chip",
+    );
+    choices(
+      document.getElementById("fonts"),
+      FONTS,
+      style.font_family,
+      (value) => { style.font_family = value; },
+      "font-chip",
+    );
+    paintPreview();
+
+    function setMessage(text, isError) {
+      const node = document.getElementById("message");
+      node.textContent = text;
+      node.className = isError ? "error" : "hint";
+    }
+
+    async function createJob() {
+      const url = document.getElementById("url").value.trim();
+      if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("file://") && !url.startsWith("/")) {
+        setMessage("Pega un enlace http(s) o una ruta del servidor.", true);
+        return;
+      }
+      document.getElementById("create").disabled = true;
+      setMessage("Creando el job…", false);
+      try {
+        const response = await fetch("/jobs", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            url,
+            max_clips: maxClips,
+            subtitle_style: style,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          const detail = payload.detail;
+          throw new Error(typeof detail === "string" ? detail : "No se pudo crear el job.");
+        }
+        watch(payload.id);
+      } catch (error) {
+        setMessage(error.message || "No llega al servidor.", true);
+        document.getElementById("create").disabled = false;
+      }
+    }
+
+    async function watch(id) {
+      clearInterval(pollTimer);
+      pollTimer = setInterval(async () => {
+        try {
+          const response = await fetch("/jobs/" + id);
+          const job = await response.json();
+          renderJob(job);
+          if (job.status === "completed" || job.status === "failed") {
+            clearInterval(pollTimer);
+            document.getElementById("create").disabled = false;
+          }
+        } catch (error) {
+          setMessage(error.message || "Se perdió la conexión.", true);
+        }
+      }, 1500);
+    }
+
+    function renderJob(job) {
+      const labels = {
+        queued: "En cola",
+        downloading: "Descargando el video",
+        analyzing: "Buscando los momentos",
+        rendering: "Quemando subtítulos y exportando",
+        completed: "Listo para ver",
+        failed: "No se pudo completar",
+      };
+      const root = document.getElementById("job");
+      root.hidden = false;
+      const styleNote = job.subtitle_style
+        ? job.subtitle_style.font_family + " · " + job.subtitle_style.font_size + " · " + job.subtitle_style.text_color
+        : "";
+      const clips = (job.clips || []).map((clip) => {
+        if (clip.status !== "ready" || !clip.playback_path) {
+          return "<p class='hint'>" + clip.title + " · " + clip.status + "</p>";
+        }
+        return "<a class='clip' href='" + clip.playback_path + "' download>Descargar " + clip.title + " (MP4 con subtítulos)</a>";
+      }).join("");
+      root.innerHTML =
+        "<p><strong>" + (labels[job.status] || job.status) + "</strong> · <code>" + job.id + "</code></p>" +
+        "<p class='hint'>" + styleNote + "</p>" +
+        (job.error ? "<p class='error'>" + job.error + "</p>" : "") +
+        clips;
+      setMessage(job.status === "completed" ? "El MP4 ya lleva el estilo quemado." : "", false);
+    }
+
+    document.getElementById("create").addEventListener("click", createJob);
+  </script>
+</body>
+</html>

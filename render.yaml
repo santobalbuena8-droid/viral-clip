@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: viral-clip
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: MAX_DURATION_SEC
+        value: "7200"
+      - key: MOCK_ANALYZE
+        value: "1"
+      - key: DATA_DIR
+        value: /data
+      - key: PYTHONUNBUFFERED
+        value: "1"

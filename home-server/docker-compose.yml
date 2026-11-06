@@ -1,0 +1,14 @@
+# Uso: desde la raíz del repo → docker compose -f home-server/docker-compose.yml up --build
+services:
+  viral-clip:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "8741:8741"
+    environment:
+      MAX_DURATION_SEC: "7200"
+      MOCK_ANALYZE: "1"
+      PORT: "8741"
+    volumes:
+      - ../data:/data
