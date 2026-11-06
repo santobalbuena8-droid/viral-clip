@@ -8,15 +8,16 @@ from __future__ import annotations
 
 import logging
 import shutil
+import subprocess
 from contextlib import asynccontextmanager
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 
-from app import __version__
+from app import __version__, demo
 from app.config import REPO_ROOT, analyze_config, max_duration_sec, output_size
-from app.models import ClipStatus, CreateJobRequest, Job
+from app.models import ClipStatus, CreateJobRequest, DemoJobRequest, Job
 from app.pipeline.errors import PipelineError
 from app.pipeline.jobs import clip_file, create_job, get_job, run_job
 from app.store import ensure_data_dir
@@ -30,6 +31,7 @@ logging.basicConfig(
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
     ensure_data_dir()
+    demo.warm_up_in_background()
     yield
 
 
@@ -78,6 +80,39 @@ def health() -> dict[str, object]:
         "output_width": width,
         "output_height": height,
     }
+
+
+@app.post("/jobs/demo", response_model=Job, status_code=202)
+def post_demo_job(background: BackgroundTasks, body: DemoJobRequest | None = None) -> Job:
+    """Crea clips desde el video de muestra del servidor (sin YouTube)."""
+    body = body or DemoJobRequest()
+    try:
+        source = demo.ensure_source()
+        job = create_job(str(source), body.max_clips, body.subtitle_style)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise HTTPException(status_code=500, detail="Falta el video de muestra en el servidor.") from exc
+    except PipelineError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    background.add_task(run_job, job.id)
+    return job
+
+
+@app.get("/demo/sample.mp4")
+def demo_sample() -> FileResponse:
+    """Clip 9:16 ya renderizado, incluido en la imagen: nunca depende de un job."""
+    path = demo.ensure_sample_clip()
+    if path is None:
+        raise HTTPException(status_code=503, detail="El clip de muestra no se pudo preparar. Prueba en unos segundos.")
+    return FileResponse(path, media_type="video/mp4", filename="viral-clip-muestra.mp4")
+
+
+@app.get("/demo/source.mp4")
+def demo_source() -> FileResponse:
+    try:
+        source = demo.ensure_source()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise HTTPException(status_code=404, detail="No está el video de muestra.") from exc
+    return FileResponse(source, media_type="video/mp4", filename="muestra_45s.mp4")
 
 
 @app.post("/jobs", response_model=Job, status_code=202)

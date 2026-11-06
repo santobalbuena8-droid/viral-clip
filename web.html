@@ -68,6 +68,18 @@
       background: var(--raised);
       color: var(--paper);
     }
+    button.demo {
+      width: 100%;
+      min-height: 52px;
+      border: 0;
+      border-radius: 12px;
+      background: #ffd23f;
+      color: #10110e;
+      font-weight: 800;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button.demo:disabled { opacity: .5; }
     button.primary {
       background: var(--lime);
       color: var(--ink);
@@ -176,11 +188,11 @@
       </div>
 
       <div class="section">Muestra lista (sin YouTube)</div>
-      <p class="hint">Si Crear clips falla, abre primero esta muestra: ya trae subtítulos quemados 9:16.</p>
+      <p class="hint">Clip 9:16 ya hecho, con subtítulos quemados. Siempre disponible.</p>
       <div class="row">
-        <a class="clip" href="/jobs/a1b2c3d4e5f6/clips/clip-1" target="_blank" rel="noopener">Ver muestra con subtítulos</a>
-        <a class="clip" href="/jobs/a1b2c3d4e5f6/clips/clip-1?download=1">Descargar MP4</a>
-        <a class="clip" href="/jobs/505a5bc45963/clips/clip-1" target="_blank" rel="noopener">Otra muestra</a>
+        <a class="clip" href="/demo/sample.mp4" target="_blank" rel="noopener">Ver muestra con subtítulos</a>
+        <a class="clip" href="/demo/sample.mp4" download="viral-clip-muestra.mp4">Descargar MP4</a>
+        <a class="clip" href="/demo/source.mp4" target="_blank" rel="noopener">Video original de muestra</a>
       </div>
 
       <div class="section">Enlace</div>
@@ -201,6 +213,8 @@
       <p class="hint">La vista previa cambia al momento. El archivo se exporta con este estilo en el siguiente «Crear clips».</p>
 
       <button class="primary" id="create" type="button">Crear clips</button>
+      <button class="demo" id="demo" type="button">Probar con video de muestra</button>
+      <p class="hint">«Probar con video de muestra» no usa YouTube: crea los clips con el estilo elegido desde un video del servidor.</p>
       <p id="message" class="hint"></p>
       <div id="job" class="job" hidden></div>
     </div>
@@ -354,17 +368,26 @@
         setMessage("Pega un enlace http(s) o una ruta del servidor.", true);
         return;
       }
-      document.getElementById("create").disabled = true;
+      await startJob("/jobs", { url, max_clips: maxClips, subtitle_style: style });
+    }
+
+    async function createDemoJob() {
+      await startJob("/jobs/demo", { max_clips: maxClips, subtitle_style: style });
+    }
+
+    function setBusy(busy) {
+      document.getElementById("create").disabled = busy;
+      document.getElementById("demo").disabled = busy;
+    }
+
+    async function startJob(path, body) {
+      setBusy(true);
       setMessage("Creando el job…", false);
       try {
-        const response = await fetch("/jobs", {
+        const response = await fetch(path, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            url,
-            max_clips: maxClips,
-            subtitle_style: style,
-          }),
+          body: JSON.stringify(body),
         });
         const payload = await response.json();
         if (!response.ok) {
@@ -374,7 +397,7 @@
         watch(payload.id);
       } catch (error) {
         setMessage(error.message || "No llega al servidor.", true);
-        document.getElementById("create").disabled = false;
+        setBusy(false);
       }
     }
 
@@ -387,7 +410,7 @@
           renderJob(job);
           if (job.status === "completed" || job.status === "failed") {
             clearInterval(pollTimer);
-            document.getElementById("create").disabled = false;
+            setBusy(false);
           }
         } catch (error) {
           setMessage(error.message || "Se perdió la conexión.", true);
@@ -432,7 +455,7 @@
       root.innerHTML =
         "<p><strong>" + (labels[job.status] || job.status) + "</strong> · <code>" + job.id + "</code></p>" +
         "<p class='hint'>" + styleNote + "</p>" +
-        (job.error ? "<p class='error'>" + job.error + "</p>" : "") +
+        (job.error ? "<p class='error'>" + escapeHtml(job.error) + (/bot|youtube/i.test(job.error) ? " Usa el botón amarillo «Probar con video de muestra»." : "") + "</p>" : "") +
         clips;
       setMessage(job.status === "completed" ? "El MP4 ya lleva el estilo quemado." : "", false);
     }
@@ -446,6 +469,7 @@
     }
 
     document.getElementById("create").addEventListener("click", createJob);
+    document.getElementById("demo").addEventListener("click", createDemoJob);
   </script>
 </body>
 </html>

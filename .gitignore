@@ -16,3 +16,4 @@ android/local.properties
 android/captures/
 *.aab
 .DS_Store
+demo/*.mp4

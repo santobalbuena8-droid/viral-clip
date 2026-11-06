@@ -68,6 +68,18 @@
       background: var(--raised);
       color: var(--paper);
     }
+    button.demo {
+      width: 100%;
+      min-height: 52px;
+      border: 0;
+      border-radius: 12px;
+      background: #ffd23f;
+      color: #10110e;
+      font-weight: 800;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button.demo:disabled { opacity: .5; }
     button.primary {
       background: var(--lime);
       color: var(--ink);
@@ -119,13 +131,50 @@
     .error { color: var(--danger); }
     .job { grid-column: 1 / -1; }
     a.clip {
-      display: block;
+      display: inline-block;
       background: var(--raised);
       color: var(--lime);
       text-decoration: none;
       border-radius: 12px;
       padding: 12px 14px;
       margin-top: 8px;
+    }
+    .clip-block { margin-top: 14px; }
+    .clip-frame {
+      position: relative;
+      width: min(100%, 220px);
+      aspect-ratio: 9 / 16;
+      background: #000;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .clip-frame video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .viral-badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 2;
+      pointer-events: none;
+      background: rgba(16, 17, 14, 0.86);
+      color: var(--lime);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.15;
+      text-align: right;
+    }
+    .viral-badge small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: 0.04em;
     }
     code { color: var(--lime); }
   </style>
@@ -136,6 +185,14 @@
       <div>
         <h1>VIRAL CLIP</h1>
         <p class="lede">Pega un enlace. El estilo de abajo se quema en el MP4 vertical al crear los clips.</p>
+      </div>
+
+      <div class="section">Muestra lista (sin YouTube)</div>
+      <p class="hint">Clip 9:16 ya hecho, con subtítulos quemados. Siempre disponible.</p>
+      <div class="row">
+        <a class="clip" href="/demo/sample.mp4" target="_blank" rel="noopener">Ver muestra con subtítulos</a>
+        <a class="clip" href="/demo/sample.mp4" download="viral-clip-muestra.mp4">Descargar MP4</a>
+        <a class="clip" href="/demo/source.mp4" target="_blank" rel="noopener">Video original de muestra</a>
       </div>
 
       <div class="section">Enlace</div>
@@ -156,6 +213,8 @@
       <p class="hint">La vista previa cambia al momento. El archivo se exporta con este estilo en el siguiente «Crear clips».</p>
 
       <button class="primary" id="create" type="button">Crear clips</button>
+      <button class="demo" id="demo" type="button">Probar con video de muestra</button>
+      <p class="hint">«Probar con video de muestra» no usa YouTube: crea los clips con el estilo elegido desde un video del servidor.</p>
       <p id="message" class="hint"></p>
       <div id="job" class="job" hidden></div>
     </div>
@@ -309,17 +368,26 @@
         setMessage("Pega un enlace http(s) o una ruta del servidor.", true);
         return;
       }
-      document.getElementById("create").disabled = true;
+      await startJob("/jobs", { url, max_clips: maxClips, subtitle_style: style });
+    }
+
+    async function createDemoJob() {
+      await startJob("/jobs/demo", { max_clips: maxClips, subtitle_style: style });
+    }
+
+    function setBusy(busy) {
+      document.getElementById("create").disabled = busy;
+      document.getElementById("demo").disabled = busy;
+    }
+
+    async function startJob(path, body) {
+      setBusy(true);
       setMessage("Creando el job…", false);
       try {
-        const response = await fetch("/jobs", {
+        const response = await fetch(path, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            url,
-            max_clips: maxClips,
-            subtitle_style: style,
-          }),
+          body: JSON.stringify(body),
         });
         const payload = await response.json();
         if (!response.ok) {
@@ -329,7 +397,7 @@
         watch(payload.id);
       } catch (error) {
         setMessage(error.message || "No llega al servidor.", true);
-        document.getElementById("create").disabled = false;
+        setBusy(false);
       }
     }
 
@@ -342,7 +410,7 @@
           renderJob(job);
           if (job.status === "completed" || job.status === "failed") {
             clearInterval(pollTimer);
-            document.getElementById("create").disabled = false;
+            setBusy(false);
           }
         } catch (error) {
           setMessage(error.message || "Se perdió la conexión.", true);
@@ -365,20 +433,43 @@
         ? job.subtitle_style.font_family + " · " + job.subtitle_style.font_size + " · " + job.subtitle_style.text_color
         : "";
       const clips = (job.clips || []).map((clip) => {
+        const title = escapeHtml(clip.title || "Clip");
+        const score = Number.isFinite(clip.virality) ? Math.round(clip.virality) : null;
+        const badge = score === null
+          ? ""
+          : "<span class='viral-badge'>Viralidad " + score + "%<small>estimación</small></span>";
         if (clip.status !== "ready" || !clip.playback_path) {
-          return "<p class='hint'>" + clip.title + " · " + clip.status + "</p>";
+          return "<div class='clip-block'><p class='hint'>" + title + " · " + escapeHtml(clip.status || "") + "</p>" +
+            (score === null ? "" : "<p class='hint'>Viralidad estimada " + score + "%</p>") + "</div>";
         }
-        return "<a class='clip' href='" + clip.playback_path + "' download>Descargar " + clip.title + " (MP4 con subtítulos)</a>";
+        const src = escapeHtml(clip.playback_path);
+        return "<div class='clip-block'>" +
+          "<div class='clip-frame'>" +
+            "<video src='" + src + "' controls playsinline preload='metadata'></video>" +
+            badge +
+          "</div>" +
+          "<a class='clip' href='" + src + "' download>Descargar " + title + "</a>" +
+          "<p class='hint'>El porcentaje solo está en esta vista. El MP4 no lo lleva.</p>" +
+        "</div>";
       }).join("");
       root.innerHTML =
         "<p><strong>" + (labels[job.status] || job.status) + "</strong> · <code>" + job.id + "</code></p>" +
         "<p class='hint'>" + styleNote + "</p>" +
-        (job.error ? "<p class='error'>" + job.error + "</p>" : "") +
+        (job.error ? "<p class='error'>" + escapeHtml(job.error) + (/bot|youtube/i.test(job.error) ? " Usa el botón amarillo «Probar con video de muestra»." : "") + "</p>" : "") +
         clips;
       setMessage(job.status === "completed" ? "El MP4 ya lleva el estilo quemado." : "", false);
     }
 
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
     document.getElementById("create").addEventListener("click", createJob);
+    document.getElementById("demo").addEventListener("click", createDemoJob);
   </script>
 </body>
 </html>

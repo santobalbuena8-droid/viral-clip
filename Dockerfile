@@ -23,6 +23,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY app ./app
 COPY scripts ./scripts
 COPY web.html ./web.html
+COPY demo ./demo
+RUN sh scripts/generate_demo.sh /app/demo/muestra_45s.mp4
 
 RUN mkdir -p /data/jobs /data/fixtures \
     && useradd --create-home --uid 10001 appuser \

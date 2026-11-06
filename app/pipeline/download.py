@@ -176,7 +176,7 @@ def _youtube_error(exc: Exception, phase: str) -> PipelineError:
     if "not a bot" in lowered or "sign in to confirm" in lowered:
         return PipelineError(
             "YouTube bloqueó la descarga y pide confirmar que no eres un bot. "
-            "Para la demo usa local_path o file:// con un MP4 en el servidor."
+            "Toca «Probar con muestra» para crear clips sin YouTube."
         )
     first = text.splitlines()[0][:500] if text else exc.__class__.__name__
     return PipelineError(f"{phase}: {first}")

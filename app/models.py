@@ -126,3 +126,12 @@ class CreateJobRequest(BaseModel):
             return str(Path(raw).expanduser())
         assert self.url is not None
         return self.url.strip()
+
+
+class DemoJobRequest(BaseModel):
+    """Cuerpo de POST /jobs/demo: usa el video de muestra incluido en la imagen."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    max_clips: int = Field(default=3, ge=1, le=5)
+    subtitle_style: SubtitleStyle = Field(default_factory=SubtitleStyle)
