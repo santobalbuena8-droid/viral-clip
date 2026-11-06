@@ -49,7 +49,7 @@ curl -sS -X POST http://127.0.0.1:8741/jobs \
   -d '{"url":"https://www.youtube.com/watch?v=jNQXAC9IVRw","max_clips":1}'
 ```
 
-Ese enlace es un video público corto («Me at the zoo», unos 19 s). En un servidor o una IP de centro de datos YouTube suele bloquear la descarga con una comprobación anti-bot. El job queda en `failed`, y el recorrido que sí cierra el pipeline es el video local de la sección siguiente. Guarda el `id` y consulta:
+Ese enlace es un video público corto («Me at the zoo», unos 19 s). En un servidor o una IP de centro de datos YouTube suele bloquear la descarga con una comprobación anti-bot. Un archivo de cookies Netscape puede ayudar en Render; los pasos están en [PRUEBA-YOUTUBE-RENDER.md](PRUEBA-YOUTUBE-RENDER.md). No está garantizado: si la IP ya está bloqueada, el job puede seguir en `failed`. El recorrido que sí cierra el pipeline sin YouTube es el video local de la sección siguiente. Guarda el `id` y consulta:
 
 ```bash
 curl -sS http://127.0.0.1:8741/jobs/EL_ID

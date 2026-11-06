@@ -4,6 +4,7 @@ forzar MOCK_ANALYZE sin reiniciar el intérprete en pruebas.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,6 +45,53 @@ def data_dir() -> Path:
     if not path.is_absolute():
         path = REPO_ROOT / path
     return path
+
+
+# Ruta que Render usa para un Secret File llamado cookies.txt.
+_DEFAULT_COOKIES = Path("/etc/secrets/cookies.txt")
+_missing_cookie_paths: set[str] = set()
+
+
+def cookies_file() -> Path | None:
+    """Archivo Netscape de cookies para yt-dlp, o None.
+
+    Si COOKIES_FILE está definida y ese archivo existe, se usa esa ruta.
+    Si no hay variable, se usa /etc/secrets/cookies.txt cuando el Secret
+    File de Render está montado. En cualquier otro caso, None.
+
+    No lee ni registra el contenido del archivo: como mucho, la ruta.
+    """
+
+    explicit = os.environ.get("COOKIES_FILE", "").strip()
+    if explicit:
+        path = Path(explicit).expanduser()
+        if path.is_file():
+            return path
+        key = str(path)
+        if key not in _missing_cookie_paths:
+            _missing_cookie_paths.add(key)
+            logging.getLogger(__name__).warning(
+                "COOKIES_FILE no apunta a un archivo existente: %s", path
+            )
+        return None
+    if _DEFAULT_COOKIES.is_file():
+        return _DEFAULT_COOKIES
+    return None
+
+
+def youtube_player_clients() -> list[str] | None:
+    """Clientes de player de YouTube, o None para el default de yt-dlp.
+
+    YOUTUBE_PLAYER_CLIENTS es una lista separada por comas
+    (por ejemplo ``web,tv_embedded``). Vacía o ausente: no se fuerza
+    player_client.
+    """
+
+    raw = os.environ.get("YOUTUBE_PLAYER_CLIENTS", "").strip()
+    if not raw:
+        return None
+    clients = [part.strip() for part in raw.split(",") if part.strip()]
+    return clients or None
 
 
 def max_duration_sec() -> float | None:

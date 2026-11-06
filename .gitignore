@@ -5,6 +5,8 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .env
+# Cookies Netscape de YouTube. No las subas al repo.
+cookies.txt
 data/jobs/*
 !data/jobs/.gitkeep
 data/fixtures/*.mp4
