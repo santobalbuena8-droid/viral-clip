@@ -455,7 +455,7 @@
       root.innerHTML =
         "<p><strong>" + (labels[job.status] || job.status) + "</strong> · <code>" + job.id + "</code></p>" +
         "<p class='hint'>" + styleNote + "</p>" +
-        (job.error ? "<p class='error'>" + escapeHtml(job.error) + (/bot|youtube/i.test(job.error) ? " Usa el botón amarillo «Probar con video de muestra»." : "") + "</p>" : "") +
+        (job.error ? "<p class='error'>" + escapeHtml(job.error) + ((/bot|youtube/i.test(job.error) && !/cookies/i.test(job.error)) ? " Usa el botón amarillo «Probar con video de muestra», cookies (Secret File) o un PC de casa." : "") + "</p>" : "") +
         clips;
       setMessage(job.status === "completed" ? "El MP4 ya lleva el estilo quemado." : "", false);
     }

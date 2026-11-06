@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from app.config import max_duration_sec
+from app.config import cookies_file, max_duration_sec, youtube_player_clients
 from app.pipeline.errors import PipelineError, VideoTooLongError
 from app.pipeline.ffprobe import has_stream, probe_duration, require_binary
 
@@ -45,6 +45,26 @@ def _ytdlp_network_opts() -> dict:
         opts["proxy"] = proxy
     # yt-dlp 2025+ wants a JS runtime for some clients.
     opts["js_runtimes"] = {"node": {}}
+    return opts
+
+
+def _ytdlp_base_opts() -> dict:
+    """Opciones comunes de cada YoutubeDL: red, cookies y clientes.
+
+    Sin YOUTUBE_PLAYER_CLIENTS no se manda player_client: yt-dlp usa
+    sus clientes por defecto. cookiefile solo entra si cookies_file()
+    devuelve una ruta. Nunca se registra el contenido de las cookies.
+    """
+
+    opts = _ytdlp_network_opts()
+    cookies = cookies_file()
+    if cookies is not None:
+        opts["cookiefile"] = str(cookies)
+        logger.info("yt-dlp cookiefile=%s", cookies)
+    clients = youtube_player_clients()
+    if clients:
+        opts["extractor_args"] = {"youtube": {"player_client": clients}}
+        logger.info("yt-dlp player_client=%s", ",".join(clients))
     return opts
 
 
@@ -137,10 +157,9 @@ def _acquire_youtube(url: str, work_dir: Path) -> MediaSource:
         ) from exc
 
     probe_opts = {
-        **_ytdlp_network_opts(),
+        **_ytdlp_base_opts(),
         "noplaylist": True,
         "skip_download": True,
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     }
     try:
         with yt_dlp.YoutubeDL(probe_opts) as ydl:
@@ -176,7 +195,8 @@ def _youtube_error(exc: Exception, phase: str) -> PipelineError:
     if "not a bot" in lowered or "sign in to confirm" in lowered:
         return PipelineError(
             "YouTube bloqueó la descarga y pide confirmar que no eres un bot. "
-            "Toca «Probar con muestra» para crear clips sin YouTube."
+            "Toca «Probar con video de muestra», configura cookies de YouTube "
+            "(COOKIES_FILE o el Secret File cookies.txt) o descarga desde un PC de casa."
         )
     first = text.splitlines()[0][:500] if text else exc.__class__.__name__
     return PipelineError(f"{phase}: {first}")
@@ -197,14 +217,13 @@ def _try_optional_subs(url: str, work_dir: Path) -> None:
     if _find_vtt(work_dir) is not None:
         return
     options = {
-        **_ytdlp_network_opts(),
+        **_ytdlp_base_opts(),
         "skip_download": True,
         "writesubtitles": True,
         "writeautomaticsub": True,
         "subtitleslangs": ["es", "en"],
         "subtitlesformat": "vtt",
         "outtmpl": str(work_dir / "source.%(ext)s"),
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     }
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
@@ -220,7 +239,7 @@ def _download_with_retries(url: str, work_dir: Path) -> Path:
     for attempt, fmt in enumerate(_FORMAT_TRIES, start=1):
         _cleanup_partials(work_dir)
         options = {
-            **_ytdlp_network_opts(),
+            **_ytdlp_base_opts(),
             "format": fmt,
             "outtmpl": str(work_dir / "source.%(ext)s"),
             "merge_output_format": "mp4",
@@ -232,9 +251,6 @@ def _download_with_retries(url: str, work_dir: Path) -> Path:
             "writesubtitles": False,
             "writeautomaticsub": False,
             "overwrites": True,
-            "extractor_args": {
-                "youtube": {"player_client": ["android", "web", "default"]}
-            },
         }
         logger.info("youtube download attempt %s format=%s", attempt, fmt)
         try:
